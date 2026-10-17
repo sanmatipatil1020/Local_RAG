@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAG System — Privacy-Preserving Local AI</title>
+  <meta name="description" content="Privacy-Preserving Local RAG System: Ask questions about your documents using local AI. No cloud. No data leaks." />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ═══════════════════════════════ HEADER ═══════════════════════════════ -->
+  <header id="header">
+    <div class="header-brand">
+      <div class="header-logo">🔒</div>
+      <div>
+        <div class="header-title">LocalRAG</div>
+        <div class="header-subtitle">Privacy-Preserving Document Intelligence</div>
+      </div>
+    </div>
+
+    <div class="header-indicators">
+      <div class="status-pill" id="ollama-pill">
+        <div class="dot"></div>
+        <span id="ollama-pill-label">Checking Ollama…</span>
+      </div>
+      <div class="status-pill" id="index-pill">
+        <div class="dot" style="background: var(--accent-primary)"></div>
+        <span id="index-pill-label">0 chunks indexed</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════ SIDEBAR ══════════════════════════════ -->
+  <aside id="sidebar">
+    <div class="nav-section-label">Navigation</div>
+
+    <div class="nav-item active" id="nav-chat" onclick="switchTab('chat')">
+      <span class="nav-icon">💬</span>
+      Chat
+    </div>
+    <div class="nav-item" id="nav-documents" onclick="switchTab('documents')">
+      <span class="nav-icon">📁</span>
+      Documents
+      <span class="nav-badge" id="doc-count-badge">0</span>
+    </div>
+    <div class="nav-item" id="nav-status" onclick="switchTab('status')">
+      <span class="nav-icon">⚙️</span>
+      System Status
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="nav-section-label">Actions</div>
+
+    <div class="nav-item" onclick="triggerRescan()">
+      <span class="nav-icon">🔄</span>
+      Rescan Folder
+    </div>
+    <div class="nav-item" onclick="clearChat()">
+      <span class="nav-icon">🗑️</span>
+      Clear Chat
+    </div>
+
+    <div class="model-card" style="margin-top: 24px;">
+      <div class="model-card-title">Local Models</div>
+      <div class="model-entry">
+        <span class="model-label">LLM</span>
+        <span class="model-value" id="sidebar-llm">mistral</span>
+      </div>
+      <div class="model-entry">
+        <span class="model-label">Embeddings</span>
+        <span class="model-value">MiniLM-L6</span>
+      </div>
+      <div class="model-entry">
+        <span class="model-label">Vector DB</span>
+        <span class="model-value">ChromaDB</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════ MAIN CONTENT ═════════════════════════════ -->
+  <main id="main-content">
+
+    <!-- ─── CHAT PANEL ──────────────────────────────────────────────────── -->
+    <section class="tab-panel active" id="panel-chat">
+
+      <div class="chat-messages" id="chat-messages">
+        <!-- Welcome state -->
+        <div class="chat-welcome" id="chat-welcome">
+          <div class="welcome-icon">🔍</div>
+          <div class="welcome-title">Ask your documents anything</div>
+          <div class="welcome-subtitle">
+            Upload documents to the <strong>Documents</strong> tab or drop files in the
+            <code>documents/</code> folder. All processing happens locally — your data never leaves this machine.
+          </div>
+          <div class="welcome-hints">
+            <div class="hint-chip" onclick="fillQuery('Summarize the main findings')">Summarize the main findings</div>
+            <div class="hint-chip" onclick="fillQuery('What are the key requirements?')">What are the key requirements?</div>
+            <div class="hint-chip" onclick="fillQuery('Explain the methodology used')">Explain the methodology</div>
+            <div class="hint-chip" onclick="fillQuery('List all defined terms')">List all defined terms</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <div class="chat-input-wrapper">
+          <textarea
+            id="chat-input"
+            placeholder="Ask a question about your documents…"
+            rows="1"
+            aria-label="Chat input"
+          ></textarea>
+          <button id="send-btn" onclick="sendMessage()" aria-label="Send message" title="Send (Enter)">
+            ➤
+          </button>
+        </div>
+        <div class="input-meta">
+          <span id="input-status">Hybrid retrieval (semantic + BM25) · Grounded by Mistral</span>
+          <span id="chunk-count-label"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── DOCUMENTS PANEL ─────────────────────────────────────────────── -->
+    <section class="tab-panel" id="panel-documents">
+      <div class="panel-inner">
+
+        <div class="panel-header">
+          <h1 class="panel-title">📁 Document Management</h1>
+          <div class="panel-actions">
+            <button class="btn btn-secondary" onclick="refreshDocuments()" id="refresh-btn">
+              🔄 Refresh
+            </button>
+            <button class="btn btn-primary" onclick="triggerRescan()" id="rescan-btn">
+              ⚡ Rescan Folder
+            </button>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-label">Total Documents</div>
+            <div class="stat-value" id="stat-total-docs">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Indexed</div>
+            <div class="stat-value text-success" id="stat-indexed">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Chunks</div>
+            <div class="stat-value" id="stat-chunks">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Errors</div>
+            <div class="stat-value text-danger" id="stat-errors">—</div>
+          </div>
+        </div>
+
+        <!-- Upload Zone -->
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="file-input" multiple
+            accept=".pdf,.docx,.txt,.java,.cs,.py,.md"
+            onchange="handleFileUpload(this.files)"
+          />
+          <div class="upload-icon">📂</div>
+          <div class="upload-title">Drop files here or click to browse</div>
+          <div class="upload-subtitle">Supports: PDF, DOCX, TXT, Java, C#, Python, Markdown</div>
+        </div>
+
+        <!-- Upload progress bar -->
+        <div id="upload-progress-wrapper" class="hidden" style="margin-bottom:16px;">
+          <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:4px;" id="upload-progress-label">Uploading…</div>
+          <div class="progress-bar-wrapper">
+            <div class="progress-bar-fill" id="upload-progress-fill" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Documents Table -->
+        <div class="doc-table-wrapper">
+          <table class="doc-table" id="doc-table">
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Type</th>
+                <th>Chunks</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="doc-table-body">
+              <tr>
+                <td colspan="5">
+                  <div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <p>No documents indexed yet.<br>Upload files above or drop them in the <code>documents/</code> folder.</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─── STATUS PANEL ────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="panel-status">
+      <div class="panel-inner">
+
+        <div class="panel-header">
+          <h1 class="panel-title">⚙️ System Status</h1>
+          <button class="btn btn-secondary" onclick="refreshStatus()">🔄 Refresh</button>
+        </div>
+
+        <div class="status-grid">
+
+          <!-- Ollama LLM -->
+          <div class="status-section">
+            <div class="status-section-title">🤖 Ollama LLM</div>
+            <div class="status-row">
+              <span class="status-row-label">Status</span>
+              <span class="status-row-value" id="s-ollama-status">—</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Active Model</span>
+              <span class="status-row-value" id="s-ollama-model">—</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Model Found</span>
+              <span class="status-row-value" id="s-model-found">—</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">API Endpoint</span>
+              <span class="status-row-value" id="s-ollama-url">localhost:11434</span>
+            </div>
+          </div>
+
+          <!-- Embeddings -->
+          <div class="status-section">
+            <div class="status-section-title">🧠 Embeddings</div>
+            <div class="status-row">
+              <span class="status-row-label">Model</span>
+              <span class="status-row-value" id="s-emb-model">all-MiniLM-L6-v2</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Backend</span>
+              <span class="status-row-value">Sentence Transformers</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Privacy</span>
+              <span class="status-row-value text-success">100% Local</span>
+            </div>
+          </div>
+
+          <!-- Vector Store -->
+          <div class="status-section">
+            <div class="status-section-title">🗄️ Vector Database</div>
+            <div class="status-row">
+              <span class="status-row-label">Engine</span>
+              <span class="status-row-value">ChromaDB</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Status</span>
+              <span class="status-row-value" id="s-chroma-status">—</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Total Chunks</span>
+              <span class="status-row-value" id="s-total-chunks">—</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Storage Path</span>
+              <span class="status-row-value" id="s-chroma-path">—</span>
+            </div>
+          </div>
+
+          <!-- File Monitor -->
+          <div class="status-section">
+            <div class="status-section-title">👁️ File Monitor</div>
+            <div class="status-row">
+              <span class="status-row-label">Status</span>
+              <span class="status-row-value" id="s-monitor-status">—</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Watched Folder</span>
+              <span class="status-row-value" id="s-watched-dir">—</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Events Processed</span>
+              <span class="status-row-value" id="s-events">—</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Last Event</span>
+              <span class="status-row-value" id="s-last-event">—</span>
+            </div>
+          </div>
+
+          <!-- Retrieval Config -->
+          <div class="status-section">
+            <div class="status-section-title">🔍 Retrieval Config</div>
+            <div class="status-row">
+              <span class="status-row-label">Method</span>
+              <span class="status-row-value">Hybrid (Semantic + BM25)</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Fusion</span>
+              <span class="status-row-value">Reciprocal Rank Fusion</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Top-K Semantic</span>
+              <span class="status-row-value">10</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Top-K BM25</span>
+              <span class="status-row-value">10</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Final Chunks to LLM</span>
+              <span class="status-row-value">5</span>
+            </div>
+          </div>
+
+          <!-- Privacy Info -->
+          <div class="status-section">
+            <div class="status-section-title">🔒 Privacy Guarantee</div>
+            <div class="status-row">
+              <span class="status-row-label">Cloud APIs</span>
+              <span class="status-row-value text-success">None used</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Internet Required</span>
+              <span class="status-row-value text-success">No (after setup)</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Data Sent Externally</span>
+              <span class="status-row-value text-success">Zero bytes</span>
+            </div>
+            <div class="status-row">
+              <span class="status-row-label">Document Storage</span>
+              <span class="status-row-value text-success">Local disk only</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- Scripts -->
+<script src="/js/app.js"></script>
+<script src="/js/documents.js"></script>
+<script src="/js/status.js"></script>
+
+</body>
+</html>

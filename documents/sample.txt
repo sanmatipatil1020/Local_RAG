@@ -1,0 +1,7 @@
+Project: Library Management System
+
+The system allows students to search for books by title and author.
+Students can borrow up to three books at a time.
+The standard borrowing period is fourteen days.
+The librarian manages book records and tracks overdue returns.
+ Copy text

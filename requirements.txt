@@ -1,0 +1,29 @@
+# Privacy-Preserving Local RAG System - Dependencies
+# Install with: pip install -r requirements.txt
+
+# Web framework
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# HTTP (used to call Ollama local API)
+requests>=2.31.0
+
+# Document parsing
+pypdf>=4.0.0
+python-docx>=1.1.0
+
+# Embeddings (local, no cloud)
+sentence-transformers>=2.7.0
+torch>=2.0.0
+
+# Vector database (persistent, local)
+chromadb>=1.0.0
+
+# Keyword search for hybrid retrieval
+rank-bm25>=0.2.2
+
+# File monitoring
+watchdog>=4.0.0
+
+# Testing
+pytest>=8.0.0

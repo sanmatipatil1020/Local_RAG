@@ -1,0 +1,41 @@
+Privacy-Preserving Local RAG System - Sample Document
+
+This document describes the key components of a privacy-preserving Retrieval-Augmented Generation (RAG) system.
+
+SYSTEM OVERVIEW
+===============
+The system consists of five main components:
+1. Document Ingestion Module - processes PDF, DOCX, TXT, Java, and C# files
+2. Embedding Engine - uses Sentence Transformers (all-MiniLM-L6-v2) for local embeddings
+3. Vector Database - ChromaDB stores all embeddings persistently on local disk
+4. Hybrid Retriever - combines BM25 keyword search with semantic vector search
+5. Answer Generator - Ollama runs the Mistral model locally for grounded responses
+
+PRIVACY GUARANTEE
+=================
+All processing occurs on the local machine. No document content, embeddings, or queries
+are sent to external cloud APIs. The system operates completely offline after the initial
+one-time model downloads (Ollama model and Sentence Transformers model).
+
+HYBRID RETRIEVAL
+================
+The retrieval system uses Reciprocal Rank Fusion (RRF) to combine:
+- Semantic search: finds conceptually similar chunks using cosine similarity
+- BM25 keyword search: finds chunks with exact or near-exact keyword matches
+This combination achieves better recall than either method alone.
+
+CHUNKING STRATEGY
+=================
+Documents are split into 512-character chunks with 80-character overlap.
+The overlap ensures that information near chunk boundaries is not lost.
+Each chunk stores metadata: source filename, page number (for PDFs), and chunk index.
+
+SUPPORTED FILE TYPES
+====================
+- PDF files (.pdf) - with page-level tracking
+- Word documents (.docx)
+- Plain text files (.txt)
+- Java source code (.java)
+- C# source code (.cs)
+- Python scripts (.py)
+- Markdown files (.md)
